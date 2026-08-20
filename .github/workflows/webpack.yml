@@ -79,10 +79,12 @@ jobs:
           export DB_NAME=topcenter_ci
           export MYSQL_ROOT_PASSWORD=topcenter_ci_root_password
           export JWT_SECRET=topcenter-ci-jwt-secret
-          export FRONTEND_PORT=3000
           export BACKEND_PORT=4000
           export MYSQL_PORT=3306
           export POCKETBASE_PORT=8090
+          export VITE_SUPABASE_URL=http://localhost:54321
+          export VITE_SUPABASE_ANON_KEY=ci-placeholder
+          export VITE_POCKETBASE_URL=http://localhost:8090
           docker compose config --quiet
 
       - name: Docker smoke test
@@ -94,23 +96,27 @@ jobs:
           export DB_NAME=topcenter_ci
           export MYSQL_ROOT_PASSWORD=topcenter_ci_root_password
           export JWT_SECRET=topcenter-ci-jwt-secret
-          export FRONTEND_PORT=3000
           export BACKEND_PORT=4000
           export MYSQL_PORT=3306
           export POCKETBASE_PORT=8090
+          export VITE_SUPABASE_URL=http://localhost:54321
+          export VITE_SUPABASE_ANON_KEY=ci-placeholder
+          export VITE_POCKETBASE_URL=http://localhost:8090
 
           docker compose up --build -d
 
-          healthy=0
+          ready=0
           for attempt in $(seq 1 36); do
-            if curl --fail --silent --show-error http://127.0.0.1:4000/healthcheck >/tmp/topcenter-health.json; then
-              healthy=1
+            app_id="$(docker compose ps -q topcenter-app)"
+            app_health="$(docker inspect --format='{{.State.Health.Status}}' "$app_id" 2>/dev/null || true)"
+            if [ "$app_health" = "healthy" ] && curl --fail --silent --show-error http://127.0.0.1:4000/healthcheck >/tmp/topcenter-health.json; then
+              ready=1
               break
             fi
             sleep 5
           done
 
-          if [ "$healthy" -ne 1 ]; then
+          if [ "$ready" -ne 1 ]; then
             docker compose ps
             docker compose logs --no-color --tail=200
             exit 1
@@ -118,7 +124,6 @@ jobs:
 
           cat /tmp/topcenter-health.json
           docker compose ps
-          test "$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose ps -q topcenter-app)")" = "healthy"
           test "$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose ps -q mysql)")" = "healthy"
           test "$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose ps -q pocketbase)")" = "healthy"
 
@@ -131,8 +136,10 @@ jobs:
           export DB_NAME=topcenter_ci
           export MYSQL_ROOT_PASSWORD=topcenter_ci_root_password
           export JWT_SECRET=topcenter-ci-jwt-secret
-          export FRONTEND_PORT=3000
           export BACKEND_PORT=4000
           export MYSQL_PORT=3306
           export POCKETBASE_PORT=8090
+          export VITE_SUPABASE_URL=http://localhost:54321
+          export VITE_SUPABASE_ANON_KEY=ci-placeholder
+          export VITE_POCKETBASE_URL=http://localhost:8090
           docker compose down -v --remove-orphans || true
