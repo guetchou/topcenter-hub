@@ -25,22 +25,26 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Synchronize lockfiles
+        shell: bash
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          npm install --package-lock-only --ignore-scripts --prefix backend
+          if git diff --quiet -- package-lock.json backend/package-lock.json; then
+            echo "lockfiles already synchronized"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -- package-lock.json backend/package-lock.json
+            git commit -m "chore: sync dependency lockfiles"
+            git push origin HEAD:${{ github.head_ref || github.ref_name }}
+          fi
+
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Frontend production audit report
-        shell: bash
-        run: |
-          npm audit --omit=dev --json > /tmp/frontend-audit.json || true
-          node - <<'NODE'
-          const report = require('/tmp/frontend-audit.json');
-          console.log('FRONTEND_AUDIT_SUMMARY', JSON.stringify(report.metadata?.vulnerabilities || {}));
-          for (const [name, item] of Object.entries(report.vulnerabilities || {})) {
-            if (['high', 'critical'].includes(item.severity)) {
-              console.log('FRONTEND_AUDIT_ITEM', JSON.stringify({ name, severity: item.severity, isDirect: item.isDirect, fixAvailable: item.fixAvailable, via: item.via }));
-            }
-          }
-          NODE
+      - name: Frontend production audit
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Lint
         run: npm run lint
@@ -54,41 +58,13 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Generate backend lockfile
-        working-directory: backend
-        run: npm install --package-lock-only --ignore-scripts
-
-      - name: Commit backend lockfile when needed
-        shell: bash
-        run: |
-          if git diff --quiet -- backend/package-lock.json; then
-            echo "backend/package-lock.json already synchronized"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -- backend/package-lock.json
-            git commit -m "chore: lock backend dependencies"
-            git push origin HEAD:${{ github.head_ref || github.ref_name }}
-          fi
-
       - name: Install backend dependencies
         working-directory: backend
         run: npm ci
 
-      - name: Backend production audit report
+      - name: Backend production audit
         working-directory: backend
-        shell: bash
-        run: |
-          npm audit --omit=dev --json > /tmp/backend-audit.json || true
-          node - <<'NODE'
-          const report = require('/tmp/backend-audit.json');
-          console.log('BACKEND_AUDIT_SUMMARY', JSON.stringify(report.metadata?.vulnerabilities || {}));
-          for (const [name, item] of Object.entries(report.vulnerabilities || {})) {
-            if (['high', 'critical'].includes(item.severity)) {
-              console.log('BACKEND_AUDIT_ITEM', JSON.stringify({ name, severity: item.severity, isDirect: item.isDirect, fixAvailable: item.fixAvailable, via: item.via }));
-            }
-          }
-          NODE
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Backend tests
         working-directory: backend
