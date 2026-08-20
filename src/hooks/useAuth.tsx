@@ -1,23 +1,18 @@
+import { useEffect } from "react";
+import { authStore } from "@/stores/authStore";
+import { authService } from "@/services/auth";
+import { useApiError } from "./useApiError";
 
-import { useEffect } from 'react';
-import { authStore } from '@/stores/authStore';
-import { authService } from '@/services/auth';
-import { UserWithProfile } from '@/types/auth';
-import { useApiError } from './useApiError';
-
-// Hook combining the auth store and the auth service actions
 export const useAuth = () => {
-  // Get the store state
-  const { 
-    user, 
-    isAuthenticated, 
-    isLoading, 
-    impersonatedUser 
+  const {
+    user,
+    isAuthenticated,
+    isLoading,
+    impersonatedUser,
   } = authStore();
-  
+
   const { handleError } = useApiError();
-  
-  // Check user auth on mount
+
   useEffect(() => {
     const checkUserAuth = async () => {
       try {
@@ -26,45 +21,29 @@ export const useAuth = () => {
         handleError(error as Error);
       }
     };
-    
+
     if (!isAuthenticated && !isLoading) {
       checkUserAuth();
     }
   }, [isAuthenticated, isLoading, handleError]);
-  
-  // Override login to support dev mode
+
   const login = async (email: string, password: string, devMode = false) => {
-    try {
-      await authService.login(email, password, devMode);
-    } catch (error) {
-      throw error;
-    }
+    await authService.login(email, password, devMode);
   };
 
   const loginWithGoogle = async () => {
-    try {
-      await authService.loginWithGoogle();
-    } catch (error) {
-      throw error;
-    }
+    await authService.loginWithGoogle();
   };
 
   const promoteToSuperAdmin = async (userId: string) => {
-    try {
-      await authService.promoteToSuperAdmin(userId);
-    } catch (error) {
-      throw error;
-    }
+    await authService.promoteToSuperAdmin(userId);
   };
-  
+
   return {
-    // State
     user,
     isAuthenticated,
     isLoading,
     impersonatedUser,
-    
-    // Actions
     login,
     loginWithGoogle,
     logout: authService.logout,
