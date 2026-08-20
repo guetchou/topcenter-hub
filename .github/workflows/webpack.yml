@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: write
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -13,6 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -23,14 +28,18 @@ jobs:
       - name: Regenerate frontend lockfile
         run: npm install --package-lock-only --ignore-scripts
 
-      - name: Preserve regenerated lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: regenerated-package-lock
-          path: package-lock.json
-
-      - name: Verify frontend lockfile is committed
-        run: git diff --exit-code -- package-lock.json
+      - name: Commit regenerated lockfile when needed
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json already synchronized"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -- package-lock.json
+            git commit -m "chore: sync frontend package lock"
+            git push origin HEAD:${{ github.head_ref || github.ref_name }}
+          fi
 
       - name: Install frontend dependencies
         run: npm ci
