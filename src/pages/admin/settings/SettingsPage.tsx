@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,7 +61,7 @@ export const SettingsPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const { error } = await supabase
         .from('page_contents')
@@ -126,35 +125,26 @@ export const SettingsPage = () => {
           <TabsTrigger value="general">Général</TabsTrigger>
           <TabsTrigger value="meta">SEO & Métadonnées</TabsTrigger>
           <TabsTrigger value="social">Réseaux sociaux</TabsTrigger>
-          <TabsTrigger value="credentials">Identifiants</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
-          <GeneralSettingsTab 
-            settings={settings} 
+          <GeneralSettingsTab
+            settings={settings}
             updateSettings={updateSettings}
           />
         </TabsContent>
 
         <TabsContent value="meta">
-          <MetaSettingsTab 
-            metaSettings={settings.meta_settings} 
+          <MetaSettingsTab
+            metaSettings={settings.meta_settings}
             updateMetaSettings={updateMetaSettings}
           />
         </TabsContent>
 
         <TabsContent value="social">
-          <SocialSettingsTab 
-            socialMedia={settings.social_media} 
+          <SocialSettingsTab
+            socialMedia={settings.social_media}
             updateSocialMedia={updateSocialMedia}
-          />
-        </TabsContent>
-
-        <TabsContent value="credentials">
-          <iframe 
-            src="/admin/credentials" 
-            className="w-full h-[calc(100vh-300px)] border-none"
-            title="Gestion des identifiants"
           />
         </TabsContent>
       </Tabs>
