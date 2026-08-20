@@ -29,6 +29,7 @@ jobs:
         shell: bash
         run: |
           npm install --package-lock-only --ignore-scripts
+          npm audit fix --package-lock-only --omit=dev
           npm install --package-lock-only --ignore-scripts --prefix backend
           if git diff --quiet -- package-lock.json backend/package-lock.json; then
             echo "lockfiles already synchronized"
