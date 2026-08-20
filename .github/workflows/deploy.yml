@@ -1,5 +1,4 @@
-
-name: 🚀 Déploiement Infomaniak
+name: Deploy Infomaniak
 
 on:
   push:
@@ -8,32 +7,46 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  verify-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Cloner le dépôt
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: ⚙️ Configurer Node.js
-        uses: actions/setup-node@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
-      - name: 🔧 Installer les dépendances
+      - name: Install frontend dependencies
         run: npm ci
 
-      - name: 🧪 Exécuter les tests
-        run: npm test || true
+      - name: Lint
+        run: npm run lint
 
-      - name: 📦 Build du projet
+      - name: Type check
+        run: npm run type-check
+
+      - name: Frontend tests
+        run: npm test -- --run
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install
+
+      - name: Backend tests
+        working-directory: backend
+        run: npm test -- --runInBand --passWithNoTests
+
+      - name: Build frontend
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
-      - name: 📤 Déploiement via FTP
+      - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -42,6 +55,3 @@ jobs:
           local-dir: ./dist/
           server-dir: /www/
           dangerous-clean-slate: true
-
-      - name: ✅ Notification de déploiement
-        run: echo "Déploiement terminé avec succès!"

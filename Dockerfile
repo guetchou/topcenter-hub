@@ -1,84 +1,44 @@
-
-# Stage de base 
-FROM node:18-alpine AS base
-
-# Installation des dépendances
-FROM base AS deps
+FROM node:20-alpine AS frontend-deps
 WORKDIR /app
-
-# Copie des fichiers package.json
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 RUN npm ci
 
-# Construction du frontend
-FROM base AS frontend-builder
+FROM frontend-deps AS frontend-builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Variables d'environnement pour le build
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
 ARG VITE_POCKETBASE_URL
-ARG VITE_GITHUB_TOKEN
-ARG VITE_INFOMANIAK_TOKEN
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
 ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 ENV VITE_POCKETBASE_URL=$VITE_POCKETBASE_URL
-ENV VITE_GITHUB_TOKEN=$VITE_GITHUB_TOKEN
-ENV VITE_INFOMANIAK_TOKEN=$VITE_INFOMANIAK_TOKEN
-
-# Construction de l'application frontend avec optimisation
 RUN npm run build
 
-# Configuration du backend
-FROM base AS backend-builder
+FROM node:20-alpine AS backend-builder
 WORKDIR /app
+COPY backend/package.json backend/package-lock.json ./
+RUN npm ci --omit=dev
+COPY backend/ ./
 
-# Copier les fichiers du backend
-COPY ./backend/package.json ./backend/package-lock.json* ./
-RUN npm ci --production
-COPY ./backend ./
-
-# Image finale
-FROM base AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
-
 ENV NODE_ENV=production
 
-# Création d'un utilisateur non-root pour plus de sécurité
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 appuser
+RUN addgroup --system --gid 1001 nodejs \
+  && adduser --system --uid 1001 --ingroup nodejs appuser \
+  && mkdir -p /app/logs /app/dist \
+  && chown -R appuser:nodejs /app
 
-# Création des répertoires de logs et d'autres répertoires nécessaires
-RUN mkdir -p /app/public /app/logs && chown -R appuser:nodejs /app
-
-USER appuser
-
-# Copie des fichiers frontend et backend
-COPY --from=frontend-builder --chown=appuser:nodejs /app/dist /app/public
-COPY --from=backend-builder --chown=appuser:nodejs /app/node_modules /app/node_modules
-COPY --from=backend-builder --chown=appuser:nodejs /app/*.js /app/
-
-# Installation de PM2 pour la gestion des processus
-RUN npm install -g pm2
-
-# Configuration et scripts de santé
-COPY --from=backend-builder --chown=appuser:nodejs /app/ecosystem.config.js /app/
-
-# Exposition des ports
-EXPOSE 3000 
-EXPOSE 4000
-
-# Script de démarrage pour gérer les variables d'environnement
-COPY --chown=appuser:nodejs docker-entrypoint.sh /app/
+COPY --from=backend-builder --chown=appuser:nodejs /app /app
+COPY --from=frontend-builder --chown=appuser:nodejs /app/dist /app/dist
+COPY --chown=appuser:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-# Script de vérification de santé
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 CMD wget --no-verbose --tries=1 --spider http://localhost:3000/healthcheck || exit 1
+USER appuser
+EXPOSE 4000
 
-# Démarrage avec le script d'entrée
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:4000/healthcheck || exit 1
+
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-
-# Démarrage de l'application avec PM2
-CMD ["pm2-runtime", "start", "ecosystem.config.js"]
+CMD ["node", "server.js"]

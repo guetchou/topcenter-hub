@@ -1,30 +1,145 @@
-
-name: NodeJS with Webpack
+name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
-
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
 
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
-    - name: Build
-      run: |
-        npm install
-        npx webpack
+      - name: Synchronize lockfiles
+        shell: bash
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          npm audit fix --package-lock-only --omit=dev || true
+          npm install --package-lock-only --ignore-scripts --prefix backend
+          if git diff --quiet -- package-lock.json backend/package-lock.json; then
+            echo "lockfiles already synchronized"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -- package-lock.json backend/package-lock.json
+            git commit -m "chore: sync dependency lockfiles"
+            git push origin HEAD:${{ github.head_ref || github.ref_name }}
+          fi
 
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Frontend production audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Frontend tests
+        run: npm test -- --run
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Backend production audit
+        working-directory: backend
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Backend tests
+        working-directory: backend
+        run: npm test -- --runInBand
+
+      - name: Validate Docker Compose configuration
+        shell: bash
+        run: |
+          export DB_USER=topcenter_ci
+          export DB_PASSWORD=topcenter_ci_password
+          export DB_NAME=topcenter_ci
+          export MYSQL_ROOT_PASSWORD=topcenter_ci_root_password
+          export JWT_SECRET=topcenter-ci-jwt-secret
+          export BACKEND_PORT=4000
+          export MYSQL_PORT=3306
+          export POCKETBASE_PORT=8090
+          export VITE_SUPABASE_URL=http://localhost:54321
+          export VITE_SUPABASE_ANON_KEY=ci-placeholder
+          export VITE_POCKETBASE_URL=http://localhost:8090
+          docker compose config --quiet
+
+      - name: Docker smoke test
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          export DB_USER=topcenter_ci
+          export DB_PASSWORD=topcenter_ci_password
+          export DB_NAME=topcenter_ci
+          export MYSQL_ROOT_PASSWORD=topcenter_ci_root_password
+          export JWT_SECRET=topcenter-ci-jwt-secret
+          export BACKEND_PORT=4000
+          export MYSQL_PORT=3306
+          export POCKETBASE_PORT=8090
+          export VITE_SUPABASE_URL=http://localhost:54321
+          export VITE_SUPABASE_ANON_KEY=ci-placeholder
+          export VITE_POCKETBASE_URL=http://localhost:8090
+
+          docker compose up --build -d
+
+          ready=0
+          for attempt in $(seq 1 36); do
+            app_id="$(docker compose ps -q topcenter-app)"
+            app_health="$(docker inspect --format='{{.State.Health.Status}}' "$app_id" 2>/dev/null || true)"
+            if [ "$app_health" = "healthy" ] && curl --fail --silent --show-error http://127.0.0.1:4000/healthcheck >/tmp/topcenter-health.json; then
+              ready=1
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            docker compose ps
+            docker compose logs --no-color --tail=200
+            exit 1
+          fi
+
+          cat /tmp/topcenter-health.json
+          docker compose ps
+          test "$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose ps -q mysql)")" = "healthy"
+          test "$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose ps -q pocketbase)")" = "healthy"
+
+      - name: Docker smoke cleanup
+        if: always()
+        shell: bash
+        run: |
+          export DB_USER=topcenter_ci
+          export DB_PASSWORD=topcenter_ci_password
+          export DB_NAME=topcenter_ci
+          export MYSQL_ROOT_PASSWORD=topcenter_ci_root_password
+          export JWT_SECRET=topcenter-ci-jwt-secret
+          export BACKEND_PORT=4000
+          export MYSQL_PORT=3306
+          export POCKETBASE_PORT=8090
+          export VITE_SUPABASE_URL=http://localhost:54321
+          export VITE_SUPABASE_ANON_KEY=ci-placeholder
+          export VITE_POCKETBASE_URL=http://localhost:8090
+          docker compose down -v --remove-orphans || true

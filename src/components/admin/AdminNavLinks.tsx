@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -6,7 +5,6 @@ import {
   LayoutDashboard,
   Users,
   Settings,
-  Key,
   Rocket,
   Bot,
   Newspaper,
@@ -53,14 +51,6 @@ export const AdminNavLinks: React.FC<AdminNavLinksProps> = ({
       >
         <Settings className="h-5 w-5" />
         <span>Paramètres</span>
-      </NavLink>
-      <NavLink
-        to="/admin/credentials"
-        className={isActiveClass}
-        onClick={closeMobileMenu}
-      >
-        <Key className="h-5 w-5" />
-        <span>Identifiants</span>
       </NavLink>
       <NavLink
         to="/admin/deploy"

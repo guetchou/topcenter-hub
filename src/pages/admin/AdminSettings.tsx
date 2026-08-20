@@ -1,12 +1,10 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { UserCredentialsManager } from "@/components/admin/UserCredentialsManager";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 const AdminSettings: React.FC = () => {
-  const [activeTab, setActiveTab] = useState("credentials");
+  const [activeTab, setActiveTab] = useState("security");
 
   return (
     <ProtectedRoute requireAdmin>
@@ -15,15 +13,10 @@ const AdminSettings: React.FC = () => {
         
         <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-8">
-            <TabsTrigger value="credentials">Identifiants</TabsTrigger>
             <TabsTrigger value="security">Sécurité</TabsTrigger>
             <TabsTrigger value="appearance">Apparence</TabsTrigger>
             <TabsTrigger value="system">Système</TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="credentials">
-            <UserCredentialsManager />
-          </TabsContent>
           
           <TabsContent value="security">
             <Card className="p-6">

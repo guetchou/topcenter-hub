@@ -1,31 +1,20 @@
-
 module.exports = {
   apps: [
     {
-      name: 'topcenter-frontend',
-      script: 'serve',
-      args: '-s public -l 9000',
+      name: 'topcenter-app',
+      script: './backend/server.js',
+      cwd: __dirname,
       env: {
         NODE_ENV: 'production',
-      },
-      watch: false,
-      max_restarts: 10,
-      restart_delay: 5000,
-    },
-    {
-      name: 'topcenter-backend',
-      script: './server.js',
-      env: {
-        NODE_ENV: 'production',
-        PORT: 9000,
+        PORT: 4000,
       },
       watch: false,
       max_memory_restart: '500M',
       max_restarts: 10,
       restart_delay: 5000,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      error_file: './logs/backend-error.log',
-      out_file: './logs/backend-out.log',
+      error_file: './backend/logs/backend-error.log',
+      out_file: './backend/logs/backend-out.log',
       merge_logs: true,
     },
   ],
