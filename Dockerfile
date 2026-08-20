@@ -1,6 +1,6 @@
 FROM node:18-alpine AS frontend-deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 RUN npm ci
 
 FROM frontend-deps AS frontend-builder
@@ -16,8 +16,8 @@ RUN npm run build
 
 FROM node:18-alpine AS backend-builder
 WORKDIR /app
-COPY backend/package.json backend/package-lock.json* ./
-RUN npm ci --omit=dev
+COPY backend/package.json ./
+RUN npm install --omit=dev
 COPY backend/ ./
 
 FROM node:18-alpine AS runner
